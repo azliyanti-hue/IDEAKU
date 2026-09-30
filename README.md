@@ -6,6 +6,17 @@ Selamat datang ke **Media Prima Deck Studio AI**! Aplikasi ini direka khas untuk
 
 ---
 
+## 🔗 Pautan Pantas & Uji Cuba (Quick Links)
+
+Untuk memudahkan rakan sepasukan dan pengguna lain mengakses serta menguji aplikasi ini secara terus:
+
+* 🚀 **Cuba Aplikasi Secara Langsung (Live Web App)**:  
+  👉 [https://ai.studio/apps/e08beb15-22da-47df-9ae7-27299f12ce01](https://ai.studio/apps/e08beb15-22da-47df-9ae7-27299f12ce01)
+* 📦 **Repositori Kod Sumber GitHub (Source Code)**:  
+  👉 [https://github.com/azliyanti-hue/IDEAKU](https://github.com/azliyanti-hue/IDEAKU)
+
+---
+
 ## 💡 Kenapa Aplikasi Ini Dicipta? (Masalah Yang Selesai)
 
 * **Cara Lama**: Sebelum ini, pasukan jualan terpaksa menghabiskan masa berjam-jam membuka fail PowerPoint kosong, mencari data rating penonton, mengira kadar harga (*rate card*), dan menaip ayat cadangan satu persatu.
@@ -71,7 +82,7 @@ Setiap cadangan disusun mengikut piawaian industri penyiaran korporat Media Prim
 
 ## 🚀 Panduan Mudah Menggunakan Aplikasi (Untuk Pengguna Baharu)
 
-1. **Buka Aplikasi**: Buka pautan aplikasi di pelayar web anda (Google Chrome disyorkan).
+1. **Buka Aplikasi**: Layari pautan aplikasi di [https://ai.studio/apps/e08beb15-22da-47df-9ae7-27299f12ce01](https://ai.studio/apps/e08beb15-22da-47df-9ae7-27299f12ce01) menggunakan pelayar web anda (Google Chrome disyorkan).
 2. **Log Masuk (Pilihan)**: Klik butang **"Log Masuk"** di bahagian atas kanan untuk menyimpan dek anda ke akaun Google secara selamat.
 3. **Pilih Sampel atau Tulis Sendiri**:
    * Untuk cuba serta-merta, klik butang sampel pantas: **F&N Susu (WHI)**, **TV9 Famili Sample**, **Milo (MHI)**, atau **Petronas (BU)**.
@@ -89,6 +100,8 @@ Setiap cadangan disusun mengikut piawaian industri penyiaran korporat Media Prim
 
 Aplikasi ini dibina dengan piawaian teknologi moden berasaskan web:
 
+* **Repositori GitHub**: [https://github.com/azliyanti-hue/IDEAKU](https://github.com/azliyanti-hue/IDEAKU)
+* **Pautan Aplikasi Siap (Deployment)**: [https://ai.studio/apps/e08beb15-22da-47df-9ae7-27299f12ce01](https://ai.studio/apps/e08beb15-22da-47df-9ae7-27299f12ce01)
 * **Antara Muka (Frontend)**: React 19, TypeScript, Tailwind CSS v4, Motion.
 * **Pelayan Backend**: Node.js, Express, TSX.
 * **Kecerdasan Buatan (AI Engine)**: Google GenAI SDK (`@google/genai`) dengan model pantas `gemini-3.8-flash`.
@@ -98,13 +111,17 @@ Aplikasi ini dibina dengan piawaian teknologi moden berasaskan web:
 ### Menjalankan Aplikasi Secara Tempatan (Local Development):
 
 ```bash
-# 1. Pasang semua pakej keperluan
+# 1. Klon repositori projek
+git clone https://github.com/azliyanti-hue/IDEAKU.git
+cd IDEAKU
+
+# 2. Pasang semua pakej keperluan
 npm install
 
-# 2. Jalankan pelayan pembangunan (port 3000)
+# 3. Jalankan pelayan pembangunan (port 3000)
 npm run dev
 
-# 3. Bina fail pengeluaran (Production Build)
+# 4. Bina fail pengeluaran (Production Build)
 npm run build
 ```
 
