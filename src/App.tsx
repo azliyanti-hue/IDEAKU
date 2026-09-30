@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PitchDeck, SlideData, WorkspaceView } from './types/deck';
 import { INITIAL_DECKS } from './data/defaultDecks';
 import { Sidebar } from './components/Sidebar';
@@ -14,10 +14,23 @@ import { AllSlidesGrid } from './components/AllSlidesGrid';
 import { PresentationModal } from './components/PresentationModal';
 import { DeckLibraryView } from './components/DeckLibraryView';
 import { RateCardsView } from './components/RateCardsView';
+import { LoginModal } from './components/LoginModal';
+import { auth, loginWithGoogle, logoutUser } from './firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import {
+  subscribeToUserDecks,
+  saveDeckToFirestore,
+  deleteDeckFromFirestore,
+} from './services/deckSync';
 
 const STORAGE_KEY = 'media_prima_omnia_decks_v3';
 
 export default function App() {
+  // Firebase Auth State
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isFirestoreConnected, setIsFirestoreConnected] = useState<boolean>(false);
+  const isSyncingFromFirestore = useRef<boolean>(false);
+
   // Load decks from LocalStorage or initialize with defaults
   const [decks, setDecks] = useState<PitchDeck[]>(() => {
     try {
@@ -43,11 +56,66 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [aiProgress, setAiProgress] = useState<{ step: string; percent: number } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
 
   const activeDeck = decks.find((d) => d.id === activeDeckId) || decks[0];
   const activeSlide = activeDeck.slides[activeSlideIndex - 1] || activeDeck.slides[0];
 
-  // Auto-save to LocalStorage
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 2800);
+  };
+
+  const handlePrintDeck = () => {
+    window.print();
+  };
+
+  // Listen to Firebase Auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      if (user) {
+        setIsFirestoreConnected(true);
+        showToast(`Signed in as ${user.displayName || user.email}`);
+      } else {
+        setIsFirestoreConnected(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Listen to Firestore real-time updates when user is logged in
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const unsubscribe = subscribeToUserDecks(
+      currentUser.uid,
+      (firestoreDecks) => {
+        if (firestoreDecks && firestoreDecks.length > 0) {
+          isSyncingFromFirestore.current = true;
+          setDecks(firestoreDecks);
+          if (!firestoreDecks.some((d) => d.id === activeDeckId)) {
+            setActiveDeckId(firestoreDecks[0].id);
+          }
+          isSyncingFromFirestore.current = false;
+        } else {
+          // If Firestore is empty for this user, seed their initial decks into Firestore
+          decks.forEach((deck) => {
+            saveDeckToFirestore(deck, currentUser.uid);
+          });
+        }
+      },
+      (error) => {
+        console.warn('Firestore subscription notice:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
+  // Auto-save to LocalStorage always, and sync to Firestore if logged in
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(decks));
@@ -56,11 +124,21 @@ export default function App() {
     }
   }, [decks]);
 
-  const showToast = (message: string) => {
-    setToastMessage(message);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 2800);
+  const handleLogin = async () => {
+    try {
+      await loginWithGoogle();
+    } catch (err) {
+      showToast('Google Sign-in was cancelled or encountered an error.');
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+      showToast('Signed out. Working in local offline mode.');
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // Switch active slide safely
@@ -82,17 +160,28 @@ export default function App() {
 
   // Update a single slide within the active deck
   const handleUpdateSlide = (updatedSlide: SlideData) => {
-    setDecks((prevDecks) =>
-      prevDecks.map((deck) => {
-        if (deck.id !== activeDeck.id) return deck;
-        return {
-          ...deck,
-          updatedAt: new Date().toISOString(),
-          slides: deck.slides.map((s) => (s.id === updatedSlide.id ? updatedSlide : s)),
-        };
-      })
-    );
-    showToast('Slide content updated & saved to LocalStorage');
+    let updatedActiveDeck: PitchDeck | null = null;
+    const newDecks = decks.map((deck) => {
+      if (deck.id !== activeDeck.id) return deck;
+      updatedActiveDeck = {
+        ...deck,
+        updatedAt: new Date().toISOString(),
+        slides: deck.slides.map((s) => (s.id === updatedSlide.id ? updatedSlide : s)),
+      };
+      return updatedActiveDeck;
+    });
+
+    setDecks(newDecks);
+
+    // Persist to Firestore if user is authenticated
+    if (currentUser && updatedActiveDeck) {
+      saveDeckToFirestore(updatedActiveDeck, currentUser.uid).catch((err) => {
+        console.warn('Firestore sync notice:', err);
+      });
+      showToast('Slide updated & synced to Cloud Firestore');
+    } else {
+      showToast('Slide updated & saved to LocalStorage');
+    }
   };
 
   // Generate / Synthesize deck via AI server endpoint with realistic step telemetry
@@ -118,7 +207,13 @@ export default function App() {
       const response = await fetch('/api/generate-deck', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brief, channel, program, budget: budget || activeDeck.budgetTier || '350k', kpi: kpi || activeDeck.targetKpi || 'culinary' }),
+        body: JSON.stringify({
+          brief,
+          channel,
+          program,
+          budget: budget || activeDeck.budgetTier || '350k',
+          kpi: kpi || activeDeck.targetKpi || 'culinary',
+        }),
       });
 
       let synthesizedData: (Partial<PitchDeck> & { channelLocked?: string; slotLocked?: string; slides?: SlideData[] }) | null = null;
@@ -137,9 +232,10 @@ export default function App() {
         setAiProgress(null);
 
         if (synthesizedData) {
+          let targetUpdatedDeck: PitchDeck | null = null;
           const updatedDecks = decks.map((d) => {
             if (d.id !== activeDeck.id) return d;
-            return {
+            targetUpdatedDeck = {
               ...d,
               clientName: synthesizedData.clientName || d.clientName,
               campaignName: synthesizedData.campaignName || d.campaignName,
@@ -153,9 +249,19 @@ export default function App() {
               updatedAt: new Date().toISOString(),
               slides: synthesizedData.slides || d.slides,
             };
+            return targetUpdatedDeck;
           });
+
           setDecks(updatedDecks);
-          showToast(`Generated 7-slide pitch deck for "${synthesizedData.clientName || activeDeck.clientName}"!`);
+
+          if (currentUser && targetUpdatedDeck) {
+            saveDeckToFirestore(targetUpdatedDeck, currentUser.uid).catch((err) => {
+              console.warn('Firestore sync notice:', err);
+            });
+            showToast(`Generated 7-slide deck & synced to Firestore!`);
+          } else {
+            showToast(`Generated 7-slide pitch deck for "${synthesizedData.clientName || activeDeck.clientName}"!`);
+          }
         } else {
           showToast('Deck refreshed with customized tactical flighting.');
         }
@@ -194,6 +300,9 @@ export default function App() {
       setDecks((prev) => [template, ...prev]);
       setActiveDeckId(template.id);
       setActiveSlideIndex(1);
+      if (currentUser) {
+        saveDeckToFirestore(template, currentUser.uid).catch(() => {});
+      }
       showToast(`Loaded "${template.campaignName}"`);
     }
   };
@@ -203,9 +312,10 @@ export default function App() {
     const id = `deck-${Date.now()}`;
     const newDeck: PitchDeck = {
       id,
+      ownerId: currentUser?.uid,
       clientName: 'New Client Enterprise',
       campaignName: 'New Broadcast Sponsorship Pitch 2025',
-      briefNotes: 'Client notes: High-impact Ramadan / festive commercial flight targeting national family demographic. Preferred TV3 linear prime slots and social short-form video amplification.',
+      briefNotes: 'Client notes: High-impact Ramadan / festive commercial flight targeting national family demographic. Preferred TV3 or TV9 linear slots and social short-form video amplification.',
       channel: 'TV3',
       slot: 'WHI',
       budgetTier: '350k',
@@ -220,6 +330,11 @@ export default function App() {
     setActiveDeckId(id);
     setActiveSlideIndex(1);
     setCurrentView('slide-studio');
+
+    if (currentUser) {
+      saveDeckToFirestore(newDeck, currentUser.uid).catch(() => {});
+    }
+
     showToast('New pitch proposal created and ready for editing');
   };
 
@@ -230,11 +345,17 @@ export default function App() {
     const duplicated: PitchDeck = {
       ...JSON.parse(JSON.stringify(target)),
       id: `deck-${Date.now()}`,
+      ownerId: currentUser?.uid,
       campaignName: `${target.campaignName} (Copy)`,
       updatedAt: new Date().toISOString(),
     };
     setDecks((prev) => [duplicated, ...prev]);
     setActiveDeckId(duplicated.id);
+
+    if (currentUser) {
+      saveDeckToFirestore(duplicated, currentUser.uid).catch(() => {});
+    }
+
     showToast(`Duplicated "${target.campaignName}"`);
   };
 
@@ -247,6 +368,11 @@ export default function App() {
       setActiveDeckId(remaining[0].id);
       setActiveSlideIndex(1);
     }
+
+    if (currentUser) {
+      deleteDeckFromFirestore(deckId).catch(() => {});
+    }
+
     showToast('Pitch deck deleted');
   };
 
@@ -269,7 +395,9 @@ export default function App() {
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-primary-container text-white shadow-2xl border border-white/10 animate-slideUp">
           <span className="material-symbols-outlined text-secondary text-[20px]">check_circle</span>
           <div className="flex flex-col">
-            <span className="text-[10px] text-surface-variant font-medium">LocalStorage Sync</span>
+            <span className="text-[10px] text-surface-variant font-medium">
+              {currentUser && isFirestoreConnected ? 'Firebase Cloud Firestore' : 'LocalStorage Sync'}
+            </span>
             <span className="text-xs font-bold text-white">{toastMessage}</span>
           </div>
         </div>
@@ -290,6 +418,9 @@ export default function App() {
         onSelectView={setCurrentView}
         sponsorshipTarget="RM 1.25M"
         inventorySecuredPercent={75}
+        currentUser={currentUser}
+        onOpenLogin={() => setIsLoginModalOpen(true)}
+        onLogout={handleLogout}
       />
 
       {/* Main Workbench Viewport */}
@@ -314,6 +445,11 @@ export default function App() {
           showLayoutGuides={showLayoutGuides}
           onToggleLayoutGuides={() => setShowLayoutGuides(!showLayoutGuides)}
           onStartPresentation={() => setIsPresentationOpen(true)}
+          currentUser={currentUser}
+          onOpenLogin={() => setIsLoginModalOpen(true)}
+          onLogout={handleLogout}
+          isFirestoreConnected={isFirestoreConnected}
+          onPrintDeck={handlePrintDeck}
         />
 
         {/* Content Area */}
@@ -556,6 +692,30 @@ export default function App() {
             </div>
           )}
         </main>
+      </div>
+
+      {/* Branded Media Prima Omnia Login Modal */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onLoginWithGoogle={handleLogin}
+      />
+
+      {/* Dedicated Print View (Rendered only on print / PDF export) */}
+      <div className="hidden print:block fixed inset-0 z-[9999] bg-white text-black p-4">
+        {activeDeck.slides.map((s, idx) => (
+          <div key={s.id} className="print-page w-full aspect-[16/9] mb-12 p-2 page-break-after">
+            <div className="text-xs font-bold text-gray-500 mb-2 font-mono">
+              {activeDeck.campaignName} &bull; Slaid 0{idx + 1}: {s.navTitle}
+            </div>
+            <SlideCanvas
+              slide={s}
+              isEditing={false}
+              showLayoutGuides={false}
+              onUpdateSlide={() => {}}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );

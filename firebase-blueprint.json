@@ -1,0 +1,130 @@
+{
+  "entities": {
+    "PitchDeck": {
+      "title": "PitchDeck",
+      "description": "A 7-slide strategic broadcast sponsorship pitch proposal created for client brands",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the pitch proposal",
+          "maxLength": 128
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the media strategist who created this proposal",
+          "maxLength": 128
+        },
+        "clientName": {
+          "type": "string",
+          "description": "Name of the client brand (e.g., F&N Susu, Dutch Lady, Milo)",
+          "maxLength": 200
+        },
+        "campaignName": {
+          "type": "string",
+          "description": "Campaign title or proposal headline",
+          "maxLength": 300
+        },
+        "briefNotes": {
+          "type": "string",
+          "description": "Unstructured client notes and commercial brief",
+          "maxLength": 5000
+        },
+        "channel": {
+          "type": "string",
+          "description": "Primary linear broadcast channel (e.g., TV3, TV9, 8TV, Omnia-360)",
+          "maxLength": 50
+        },
+        "slot": {
+          "type": "string",
+          "description": "Flagship slot or custom new program",
+          "maxLength": 200
+        },
+        "budgetTier": {
+          "type": "string",
+          "description": "Budget tier indication",
+          "maxLength": 50
+        },
+        "targetKpi": {
+          "type": "string",
+          "description": "Commercial campaign target KPI",
+          "maxLength": 100
+        },
+        "recommendedTier": {
+          "type": "string",
+          "description": "Recommended investment tier price",
+          "maxLength": 50
+        },
+        "grossImpressions": {
+          "type": "string",
+          "description": "Estimated gross impressions reach",
+          "maxLength": 50
+        },
+        "slides": {
+          "type": "array",
+          "description": "Array of 7 structured presentation slides data"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp when the proposal was created"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp when the proposal was last updated"
+        }
+      },
+      "required": ["id", "ownerId", "clientName", "campaignName", "channel", "slot", "slides"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Profile information for an authenticated media planner or strategist",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "description": "Work email address",
+          "maxLength": 256
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name of the user",
+          "maxLength": 150
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Avatar URL",
+          "maxLength": 1000
+        },
+        "role": {
+          "type": "string",
+          "description": "User role in Omnia Studio",
+          "enum": ["strategist", "planner", "admin"]
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last profile update"
+        }
+      },
+      "required": ["uid", "email"]
+    }
+  },
+  "firestore": {
+    "/pitch_decks/{deckId}": {
+      "schema": {
+        "$ref": "#/entities/PitchDeck"
+      },
+      "description": "Collection of strategic pitch proposals keyed by proposal ID"
+    },
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Collection of user profiles keyed by user Auth UID"
+    }
+  }
+}

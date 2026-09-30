@@ -50,11 +50,11 @@ export const SlideCanvas: React.FC<SlideCanvasProps> = ({
     >
       {/* Broadcast Safe Zone 95% Overlay Guide */}
       {showLayoutGuides && !isThumbnail && (
-        <div className="absolute inset-[2.5%] pointer-events-none z-30 border-2 border-dashed border-red-500/50 rounded flex flex-col justify-between p-2">
-          <div className="flex justify-between items-center text-[10px] font-mono text-red-500 font-bold bg-white/70 px-1 rounded backdrop-blur-sm self-start">
-            TV3 Safe Action Zone (95%)
+        <div className="absolute inset-[2.5%] pointer-events-none z-30 border-2 border-dashed border-red-500/60 rounded flex flex-col justify-between p-2 shadow-inner">
+          <div className="flex justify-between items-center text-[10px] font-mono text-red-600 font-bold bg-white/80 px-2 py-0.5 rounded backdrop-blur-sm self-start shadow-xs">
+            TV3 &amp; TV9 Broadcast Safe Action Zone (95%)
           </div>
-          <div className="flex justify-between items-center text-[10px] font-mono text-red-500 font-bold bg-white/70 px-1 rounded backdrop-blur-sm self-end">
+          <div className="flex justify-between items-center text-[10px] font-mono text-red-600 font-bold bg-white/80 px-2 py-0.5 rounded backdrop-blur-sm self-end shadow-xs">
             16:9 Broadcast Safe
           </div>
         </div>

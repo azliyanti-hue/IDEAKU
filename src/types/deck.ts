@@ -92,6 +92,7 @@ export interface SlideData {
 
 export interface PitchDeck {
   id: string;
+  ownerId?: string;
   clientName: string;
   campaignName: string;
   briefNotes: string;
